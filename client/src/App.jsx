@@ -2,17 +2,33 @@ import React, { useState, useEffect, useRef } from 'react';
 import { gsap } from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import ClockScene from './components/three/ClockScene';
-import DashboardSkeleton from './components/dashboard/DashboardSkeleton';
+import MainDashboard from './components/dashboard/MainDashboard';
+import HistoryView from './components/history/HistoryView';
+import { useReminders } from './hooks/useReminders';
 
 gsap.registerPlugin(ScrollTrigger);
 
 export default function App() {
+  const [currentView, setCurrentView] = useState('main'); // 'main' | 'history'
   const [explosionProgress, setExplosionProgress] = useState(0);
   const [clockOpacity, setClockOpacity] = useState(1);
   const scrollContainerRef = useRef(null);
-  const progressObj = useRef({ progress: 0, opacity: 1 });
+
+  // Central reminder engine
+  const {
+    reminders,
+    occurrences,
+    nextUpcoming,
+    completedCount,
+    createReminder,
+    completeOccurrence,
+    snoozeOccurrence,
+    deleteOccurrence,
+  } = useReminders();
 
   useEffect(() => {
+    if (currentView !== 'main') return;
+
     // Respect prefers-reduced-motion
     const mediaQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
     if (mediaQuery.matches) {
@@ -31,16 +47,13 @@ export default function App() {
         onUpdate: (self) => {
           const scrollFraction = self.progress; // 0 to 1
 
-          // Phase 1 to 4: 0.0 to 0.75 -> Explode clock
-          // Phase 5 to 6: 0.75 to 1.0 -> Fade out 3D clock and transition into dashboard
+          // 0.0 to 0.75 -> Explode clock along Z-axis
+          // 0.75 to 1.0 -> Fade out 3D clock and transition cleanly into the dashboard
           let p = Math.min(scrollFraction / 0.75, 1.0);
           let op = 1.0;
           if (scrollFraction > 0.72) {
             op = Math.max(0, 1.0 - (scrollFraction - 0.72) / 0.18);
           }
-
-          progressObj.current.progress = p;
-          progressObj.current.opacity = op;
 
           setExplosionProgress(p);
           setClockOpacity(op);
@@ -49,7 +62,7 @@ export default function App() {
     });
 
     return () => ctx.revert();
-  }, []);
+  }, [currentView]);
 
   const handleSkipToDashboard = () => {
     const dashboardEl = document.getElementById('dashboard-section');
@@ -62,8 +75,21 @@ export default function App() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
+  // SCENE TRANSFORMATION: If in 'history' view, render strictly the full-screen History Journal
+  if (currentView === 'history') {
+    return (
+      <HistoryView
+        occurrences={occurrences}
+        onBack={() => setCurrentView('main')}
+        onComplete={completeOccurrence}
+        onSnooze={snoozeOccurrence}
+        onDelete={deleteOccurrence}
+      />
+    );
+  }
+
   return (
-    <div className="relative bg-chronos-bg text-chronos-text selection:bg-chronos-brass selection:text-chronos-bg">
+    <div className="relative bg-chronos-bg text-chronos-text selection:bg-chronos-brass selection:text-chronos-bg min-h-screen">
       {/* Fixed 3D Canvas Host (Active throughout the opening scroll sequence) */}
       {clockOpacity > 0.01 && (
         <ClockScene explosionProgress={explosionProgress} opacity={clockOpacity} />
@@ -74,7 +100,7 @@ export default function App() {
         <div className="fixed top-6 right-6 z-50">
           <button
             onClick={handleSkipToDashboard}
-            className="text-xs font-sans uppercase tracking-widest bg-chronos-surface/80 backdrop-blur-md border border-antique hover:border-chronos-gold text-chronos-gold px-4 py-2 rounded-sm shadow-brass-subtle hover:scale-105 transition-all duration-200"
+            className="text-xs font-sans uppercase tracking-widest bg-chronos-surface/85 backdrop-blur-md border border-antique hover:border-chronos-gold text-chronos-gold px-4 py-2 rounded-sm shadow-brass-subtle hover:scale-105 transition-all duration-200"
           >
             Enter Dashboard ↓
           </button>
@@ -107,7 +133,7 @@ export default function App() {
 
         {/* SCENE 2: BEZEL & CRYSTAL SEPARATION */}
         <section className="h-screen flex items-center justify-start p-8 md:p-24 pointer-events-none select-none">
-          <div className="max-w-md p-6 bg-chronos-bgSecondary/75 backdrop-blur-sm border-l-2 border-chronos-gold border-y border-r border-antique/30 rounded-r-sm">
+          <div className="max-w-md p-6 bg-chronos-bgSecondary/80 backdrop-blur-sm border-l-2 border-chronos-gold border-y border-r border-antique/30 rounded-r-sm">
             <span className="text-xs font-mono uppercase tracking-widest text-chronos-brass">
               Phase I • Exterior Dismantling
             </span>
@@ -122,7 +148,7 @@ export default function App() {
 
         {/* SCENE 3: DIAL & HANDS LIFTING */}
         <section className="h-screen flex items-center justify-end p-8 md:p-24 pointer-events-none select-none">
-          <div className="max-w-md p-6 bg-chronos-bgSecondary/75 backdrop-blur-sm border-r-2 border-chronos-gold border-y border-l border-antique/30 rounded-l-sm text-right">
+          <div className="max-w-md p-6 bg-chronos-bgSecondary/80 backdrop-blur-sm border-r-2 border-chronos-gold border-y border-l border-antique/30 rounded-l-sm text-right">
             <span className="text-xs font-mono uppercase tracking-widest text-chronos-brass">
               Phase II • The Chapter Ring
             </span>
@@ -137,7 +163,7 @@ export default function App() {
 
         {/* SCENE 4: AXIAL EXPLODED BLUEPRINT */}
         <section className="h-screen flex items-center justify-start p-8 md:p-24 pointer-events-none select-none">
-          <div className="max-w-md p-6 bg-chronos-bgSecondary/75 backdrop-blur-sm border-l-2 border-chronos-gold border-y border-r border-antique/30 rounded-r-sm">
+          <div className="max-w-md p-6 bg-chronos-bgSecondary/80 backdrop-blur-sm border-l-2 border-chronos-gold border-y border-r border-antique/30 rounded-r-sm">
             <span className="text-xs font-mono uppercase tracking-widest text-chronos-brass">
               Phase III • Exploded Gear Train
             </span>
@@ -160,15 +186,24 @@ export default function App() {
               Entering the Chamber of Time
             </h2>
             <p className="text-sm font-sans text-chronos-parchment/80 mt-3 leading-relaxed">
-              The deconstructed clock components dissolve into the darkness, making way for your handcrafted reminder workspace.
+              The deconstructed clock components dissolve into the darkness, revealing your handcrafted reminder workspace.
             </p>
           </div>
         </section>
       </div>
 
-      {/* SCENE 6: THE DASHBOARD (The Hand-Drawn Interface) */}
+      {/* SCENE 6: THE MAIN DASHBOARD (Your Hand-Drawn Design) */}
       <div className="relative z-30">
-        <DashboardSkeleton onBackToOpening={handleBackToOpening} />
+        <MainDashboard
+          reminders={reminders}
+          nextReminder={nextUpcoming}
+          completedCount={completedCount}
+          onCreateReminder={createReminder}
+          onCompleteOccurrence={completeOccurrence}
+          onSnoozeOccurrence={snoozeOccurrence}
+          onOpenHistory={() => setCurrentView('history')}
+          onBackToOpening={handleBackToOpening}
+        />
       </div>
     </div>
   );
