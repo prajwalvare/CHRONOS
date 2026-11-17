@@ -1,20 +1,22 @@
+// App.jsx – restored layout: watch centered, Chronos name visible at top
 import React, { useState, useEffect, useRef } from 'react';
-import { gsap } from 'gsap';
-import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import ClockScene from './components/three/ClockScene';
 import MainDashboard from './components/dashboard/MainDashboard';
 import HistoryView from './components/history/HistoryView';
 import { useReminders } from './hooks/useReminders';
-
-gsap.registerPlugin(ScrollTrigger);
+import { usePush } from './hooks/usePush';
 
 export default function App() {
+  // ---- view state -------------------------------------------------------
   const [currentView, setCurrentView] = useState('main'); // 'main' | 'history'
-  const [explosionProgress, setExplosionProgress] = useState(0);
-  const [clockOpacity, setClockOpacity] = useState(1);
-  const scrollContainerRef = useRef(null);
+  const [showHero, setShowHero] = useState(true);
+  const heroRef = useRef(null);
+  const dashboardRef = useRef(null);
 
-  // Live REST API & Prisma State Engine
+  // ---- request push permission on mount (Phase 7) -----------------------
+  usePush();
+
+  // ---- API hooks --------------------------------------------------------
   const {
     nextUpcoming,
     completedCount,
@@ -29,48 +31,45 @@ export default function App() {
     refreshDashboard,
   } = useReminders();
 
+  // ---- hero visibility – fades out when scrolled out of view ------------
   useEffect(() => {
-    if (currentView !== 'main') return;
+    const el = heroRef.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => setShowHero(entry.isIntersecting),
+      { threshold: 0.1 }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
 
-    // Respect prefers-reduced-motion
-    const mediaQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
-    if (mediaQuery.matches) {
-      setExplosionProgress(1);
-      setClockOpacity(0);
-      return;
-    }
+  // ---- scroll‑driven animation for the 3‑D Clock (mirrors old GSAP) -----
+  const [explosionProgress, setExplosionProgress] = useState(0);
+  const [clockOpacity, setClockOpacity] = useState(1);
+  useEffect(() => {
+    const onScroll = () => {
+      if (!heroRef.current) return;
+      const rect = heroRef.current.getBoundingClientRect();
+      const viewportHeight = window.innerHeight;
+      const progress = Math.min(1, Math.max(0, -rect.top / viewportHeight));
 
-    const ctx = gsap.context(() => {
-      // ScrollTrigger scrub for smooth opening
-      ScrollTrigger.create({
-        trigger: scrollContainerRef.current,
-        start: 'top top',
-        end: 'bottom bottom',
-        scrub: 1.0,
-        onUpdate: (self) => {
-          const scrollFraction = self.progress; // 0 to 1
+      const p = Math.min(progress / 0.75, 1);
+      let op = 1;
+      if (progress > 0.72) {
+        op = Math.max(0, 1 - (progress - 0.72) / 0.18);
+      }
+      setExplosionProgress(p);
+      setClockOpacity(op);
+    };
+    window.addEventListener('scroll', onScroll, { passive: true });
+    onScroll();
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
 
-          // 0.0 to 0.75 -> Smoothly open the watch mechanism
-          // 0.75 to 1.0 -> Fade out 3D clock and transition into dashboard
-          let p = Math.min(scrollFraction / 0.75, 1.0);
-          let op = 1.0;
-          if (scrollFraction > 0.72) {
-            op = Math.max(0, 1.0 - (scrollFraction - 0.72) / 0.18);
-          }
-
-          setExplosionProgress(p);
-          setClockOpacity(op);
-        },
-      });
-    });
-
-    return () => ctx.revert();
-  }, [currentView]);
-
+  // ---- navigation helpers ------------------------------------------------
   const handleSkipToDashboard = () => {
-    const dashboardEl = document.getElementById('dashboard-section');
-    if (dashboardEl) {
-      dashboardEl.scrollIntoView({ behavior: 'smooth' });
+    if (dashboardRef.current) {
+      dashboardRef.current.scrollIntoView({ behavior: 'smooth' });
     }
   };
 
@@ -78,7 +77,7 @@ export default function App() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  // Full-screen History Journal View
+  // ---- full‑screen history view -----------------------------------------
   if (currentView === 'history') {
     return (
       <HistoryView
@@ -92,15 +91,19 @@ export default function App() {
     );
   }
 
+  // ---- main UI ----------------------------------------------------------
   return (
     <div className="relative bg-chronos-bg text-chronos-text selection:bg-chronos-brass selection:text-chronos-bg min-h-screen">
-      {/* Fixed 3D Canvas Host (Active throughout the opening scroll sequence) */}
-      {clockOpacity > 0.01 && (
-        <ClockScene explosionProgress={explosionProgress} opacity={clockOpacity} />
+
+      {/* Watch – centred, visible only while hero is on screen */}
+      {showHero && (
+        <div className="fixed inset-0 flex items-center justify-center pointer-events-none">
+          <ClockScene explosionProgress={explosionProgress} opacity={clockOpacity} />
+        </div>
       )}
 
-      {/* Floating Skip / Navigation Control */}
-      {clockOpacity > 0.2 && (
+      {/* Skip button – appears while hero is visible */}
+      {showHero && (
         <div className="fixed top-6 right-6 z-50">
           <button
             onClick={handleSkipToDashboard}
@@ -111,40 +114,32 @@ export default function App() {
         </div>
       )}
 
-      {/* Clean Scroll Waypoints (Pure visual opening with zero clutter) */}
-      <div ref={scrollContainerRef} className="relative z-20">
-        {/* Top Hero Screen: Title & Scroll Invitation */}
-        <section className="h-screen flex flex-col justify-between items-center p-8 text-center pointer-events-none select-none">
-          <div className="pt-10">
-            <span className="text-xs uppercase tracking-[0.4em] text-chronos-brass font-sans block mb-2">
-              Horological Instrument
-            </span>
-            <h1 className="text-5xl md:text-7xl font-bold font-serif tracking-wider text-gold-gradient drop-shadow-md">
-              CHRONOS
-            </h1>
-            <p className="text-sm font-serif italic text-chronos-textMuted mt-2 max-w-md mx-auto">
-              An antique mechanical timepiece and reminder engine.
-            </p>
-          </div>
+      {/* Hero overlay – contains title and scroll cue */}
+      <section
+        ref={heroRef}
+        className="h-screen relative pointer-events-none select-none transition-opacity duration-500"
+        style={{ opacity: showHero ? 1 : 0 }}
+      >
+        {/* Title – fixed at top of viewport */}
+        <div className="absolute top-0 left-0 w-full text-center p-8">
+          <span className="text-xs uppercase tracking-[0.4em] text-chronos-brass font-sans block mb-2">Horological Instrument</span>
+          <h1 className="text-5xl md:text-7xl font-bold font-serif tracking-wider text-gold-gradient drop-shadow-md">CHRONOS</h1>
+          <p className="text-sm font-serif italic text-chronos-textMuted mt-2 max-w-md mx-auto">
+            An antique mechanical timepiece and reminder engine.
+          </p>
+        </div>
+        {/* Scroll cue – fixed at bottom */}
+        <div className="absolute bottom-8 w-full text-center">
+          <span className="text-[11px] uppercase tracking-[0.3em] text-chronos-gold font-sans block mb-1">Scroll To Open Mechanism</span>
+          <span className="text-xl text-chronos-brass inline-block animate-bounce">↓</span>
+        </div>
+      </section>
 
-          <div
-            className="pb-8 transition-opacity duration-300"
-            style={{ opacity: Math.max(0, 1 - explosionProgress * 2.5) }}
-          >
-            <span className="text-[11px] uppercase tracking-[0.3em] text-chronos-gold font-sans block mb-1">
-              Scroll To Open Mechanism
-            </span>
-            <span className="text-xl text-chronos-brass inline-block animate-bounce">↓</span>
-          </div>
-        </section>
+      {/* Filler to allow scrolling */}
+      <section className="h-screen pointer-events-none" />
 
-        {/* Scroll spaces for smooth mechanism opening */}
-        <section className="h-screen pointer-events-none" />
-        <section className="h-screen pointer-events-none" />
-      </div>
-
-      {/* SCENE 6: THE MAIN DASHBOARD (Your Hand-Drawn Blueprint) */}
-      <div className="relative z-30">
+      {/* Dashboard – target for skip button */}
+      <div ref={dashboardRef} id="dashboard-section" className="relative z-30">
         <MainDashboard
           nextReminder={nextUpcoming}
           completedCount={completedCount}
