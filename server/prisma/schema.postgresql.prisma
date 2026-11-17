@@ -1,0 +1,56 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Reminder {
+  id          String   @id @default(cuid())
+  title       String
+  description String?
+  scheduledAt DateTime
+  timezone    String   @default("UTC")
+  recurrence  String   @default("none")
+  priority    String   @default("medium")
+  category    String   @default("personal")
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  occurrences ReminderOccurrence[]
+
+  @@index([scheduledAt])
+  @@index([isActive])
+}
+
+model ReminderOccurrence {
+  id           String    @id @default(cuid())
+  reminderId   String
+  title        String
+  description  String?
+  scheduledAt  DateTime
+  warningAt    DateTime
+  triggeredAt  DateTime?
+  status       String    @default("upcoming")
+  completedAt  DateTime?
+  snoozedUntil DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  reminder     Reminder  @relation(fields: [reminderId], references: [id], onDelete: Cascade)
+
+  @@index([status])
+  @@index([scheduledAt])
+  @@index([reminderId])
+}
+
+model PushSubscription {
+  id        String   @id @default(cuid())
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+  createdAt DateTime @default(now())
+}

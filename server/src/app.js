@@ -3,6 +3,10 @@ import helmet from 'helmet';
 import cors from 'cors';
 import rateLimit from 'express-rate-limit';
 
+import reminderRoutes from './routes/reminderRoutes.js';
+import occurrenceRoutes from './routes/occurrenceRoutes.js';
+import statsRoutes from './routes/statsRoutes.js';
+
 const app = express();
 
 // Security Headers
@@ -20,7 +24,7 @@ app.use(
 // Rate Limiting
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 300, // limit each IP to 300 requests per windowMs
+  max: 500, // allow 500 requests per windowMs
   standardHeaders: true,
   legacyHeaders: false,
 });
@@ -30,7 +34,7 @@ app.use('/api', limiter);
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Health Check Endpoint (Phase 1 Baseline)
+// Health Check Endpoint
 app.get('/api/health', (req, res) => {
   res.json({
     status: 'ok',
@@ -39,6 +43,11 @@ app.get('/api/health', (req, res) => {
     environment: process.env.NODE_ENV || 'development',
   });
 });
+
+// REST API Routes
+app.use('/api/reminders', reminderRoutes);
+app.use('/api/occurrences', occurrenceRoutes);
+app.use('/api/stats', statsRoutes);
 
 // Centralized 404 Handler
 app.use('/api/*', (req, res) => {
