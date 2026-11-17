@@ -1,0 +1,28 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    background-color: #080807;
+    color: #E9E0D0;
+    overflow-x: hidden;
+  }
+}
+
+/* Custom utility for antique engravings */
+.text-gold-gradient {
+  background: linear-gradient(135deg, #E5C78A 0%, #C9A45C 50%, #A98143 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.border-antique {
+  border-color: rgba(169, 129, 67, 0.35);
+}
+
+.bg-surface-vintage {
+  background-color: #1C1914;
+  background-image: radial-gradient(rgba(201, 164, 92, 0.04) 1px, transparent 1px);
+  background-size: 16px 16px;
+}
