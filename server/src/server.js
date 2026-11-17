@@ -2,11 +2,14 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 import app from './app.js';
+import { autoSeedIfEmpty } from './prisma/seed.js';
 
 const PORT = process.env.PORT || 5050;
 
-const server = app.listen(PORT, () => {
+const server = app.listen(PORT, async () => {
   console.log(`[CHRONOS Server] Horological engine listening on http://localhost:${PORT}`);
+  // Ensure database has initial records if empty
+  await autoSeedIfEmpty();
 });
 
 // Graceful Shutdown

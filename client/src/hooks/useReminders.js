@@ -1,225 +1,153 @@
-import { useState, useEffect, useMemo } from 'react';
-
-const STORAGE_KEY_REMINDERS = 'chronos_reminders_v1';
-const STORAGE_KEY_OCCURRENCES = 'chronos_occurrences_v1';
-
-// Initial sample data so the dashboard is immediately rich and testable
-const INITIAL_REMINDERS = [
-  {
-    id: 'rem-1',
-    title: 'Winding of the Marine Chronometer',
-    description: 'Carefully check escapement beat and wind the mainspring.',
-    scheduledAt: new Date(Date.now() + 1000 * 60 * 45).toISOString(), // 45 mins from now
-    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-    priority: 'high',
-    category: 'horology',
-    recurrence: 'daily',
-    isActive: true,
-  },
-  {
-    id: 'rem-2',
-    title: 'Study Data Structures & Algorithms',
-    description: 'Solve dynamic programming and graph problems.',
-    scheduledAt: new Date(Date.now() + 1000 * 60 * 60 * 4).toISOString(), // 4 hours from now
-    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-    priority: 'medium',
-    category: 'study',
-    recurrence: 'daily',
-    isActive: true,
-  },
-];
-
-const INITIAL_OCCURRENCES = [
-  {
-    id: 'occ-1',
-    reminderId: 'rem-1',
-    title: 'Winding of the Marine Chronometer',
-    description: 'Carefully check escapement beat and wind the mainspring.',
-    scheduledAt: new Date(Date.now() + 1000 * 60 * 45).toISOString(),
-    status: 'upcoming',
-    completedAt: null,
-    snoozedUntil: null,
-    priority: 'high',
-    category: 'horology',
-  },
-  {
-    id: 'occ-2',
-    reminderId: 'rem-2',
-    title: 'Study Data Structures & Algorithms',
-    description: 'Solve dynamic programming and graph problems.',
-    scheduledAt: new Date(Date.now() + 1000 * 60 * 60 * 4).toISOString(),
-    status: 'upcoming',
-    completedAt: null,
-    snoozedUntil: null,
-    priority: 'medium',
-    category: 'study',
-  },
-  {
-    id: 'occ-past-1',
-    reminderId: 'rem-past',
-    title: 'Clean Pinions and Jewels with Benzine',
-    description: 'Ultrasonic cleaning of watch movement parts.',
-    scheduledAt: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString(),
-    status: 'completed',
-    completedAt: new Date(Date.now() - 1000 * 60 * 60 * 23).toISOString(),
-    snoozedUntil: null,
-    priority: 'high',
-    category: 'horology',
-  },
-  {
-    id: 'occ-past-2',
-    reminderId: 'rem-past',
-    title: 'Review System Design Principles',
-    description: 'Microservices, cache invalidation, and database partitioning.',
-    scheduledAt: new Date(Date.now() - 1000 * 60 * 60 * 48).toISOString(),
-    status: 'completed',
-    completedAt: new Date(Date.now() - 1000 * 60 * 60 * 47).toISOString(),
-    snoozedUntil: null,
-    priority: 'medium',
-    category: 'study',
-  },
-];
+import { useState, useEffect, useCallback } from 'react';
+import { api } from '../services/api';
 
 export function useReminders() {
-  const [reminders, setReminders] = useState(() => {
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY_REMINDERS);
-      return stored ? JSON.parse(stored) : INITIAL_REMINDERS;
-    } catch {
-      return INITIAL_REMINDERS;
-    }
+  const [stats, setStats] = useState({
+    completedCount: 0,
+    upcomingCount: 0,
+    totalReminders: 0,
+    nextUpcoming: null,
   });
+  const [occurrences, setOccurrences] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  const [occurrences, setOccurrences] = useState(() => {
+  // Fetch Dashboard Stats & Recent Occurrences from REST API
+  const refreshDashboard = useCallback(async () => {
     try {
-      const stored = localStorage.getItem(STORAGE_KEY_OCCURRENCES);
-      return stored ? JSON.parse(stored) : INITIAL_OCCURRENCES;
-    } catch {
-      return INITIAL_OCCURRENCES;
+      setLoading(true);
+      setError(null);
+      const [statsData, occsData] = await Promise.all([
+        api.getStats(),
+        api.getOccurrences({ sort: 'desc' }),
+      ]);
+      setStats(statsData);
+      setOccurrences(occsData);
+    } catch (err) {
+      console.error('[useReminders Error]:', err);
+      setError(err.message || 'Failed to connect to backend engine');
+    } finally {
+      setLoading(false);
     }
-  });
+  }, []);
 
   useEffect(() => {
+    refreshDashboard();
+  }, [refreshDashboard]);
+
+  // Create a Reminder via POST /api/reminders
+  const createReminder = async (formData) => {
     try {
-      localStorage.setItem(STORAGE_KEY_REMINDERS, JSON.stringify(reminders));
-    } catch (e) {
-      console.warn('Could not save reminders to localStorage', e);
-    }
-  }, [reminders]);
+      setError(null);
+      // Construct UTC ISO timestamp from date and time strings
+      const scheduledIso = new Date(`${formData.date}T${formData.time}`).toISOString();
 
-  useEffect(() => {
+      const payload = {
+        title: formData.title,
+        description: formData.description || null,
+        scheduledAt: scheduledIso,
+        timezone: formData.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone,
+        priority: formData.priority || 'medium',
+        category: formData.category || 'personal',
+        recurrence: formData.recurrence || 'none',
+      };
+
+      const result = await api.createReminder(payload);
+      await refreshDashboard();
+      return result;
+    } catch (err) {
+      console.error('[createReminder Error]:', err);
+      setError(err.message);
+      throw err;
+    }
+  };
+
+  // Complete an Occurrence via PATCH /api/occurrences/:id/status
+  const completeOccurrence = async (occurrenceId) => {
     try {
-      localStorage.setItem(STORAGE_KEY_OCCURRENCES, JSON.stringify(occurrences));
-    } catch (e) {
-      console.warn('Could not save occurrences to localStorage', e);
+      setError(null);
+      await api.updateOccurrenceStatus(occurrenceId, 'completed');
+      await refreshDashboard();
+    } catch (err) {
+      console.error('[completeOccurrence Error]:', err);
+      setError(err.message);
+      throw err;
     }
-  }, [occurrences]);
-
-  // Derived: Strictly single earliest upcoming reminder
-  const nextUpcoming = useMemo(() => {
-    const upcomingList = occurrences
-      .filter((o) => o.status === 'upcoming' || o.status === 'snoozed')
-      .sort((a, b) => new Date(a.scheduledAt) - new Date(b.scheduledAt));
-
-    return upcomingList[0] || null;
-  }, [occurrences]);
-
-  // Derived: Completed occurrences count for the Trophy
-  const completedCount = useMemo(() => {
-    return occurrences.filter((o) => o.status === 'completed').length;
-  }, [occurrences]);
-
-  // Actions
-  const createReminder = (data) => {
-    const id = 'rem-' + Date.now();
-    const scheduledIso = new Date(`${data.date}T${data.time}`).toISOString();
-
-    const newReminder = {
-      id,
-      title: data.title,
-      description: data.description || '',
-      scheduledAt: scheduledIso,
-      timezone: data.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone,
-      priority: data.priority || 'medium',
-      category: data.category || 'personal',
-      recurrence: data.recurrence || 'none',
-      isActive: true,
-    };
-
-    const newOccurrence = {
-      id: 'occ-' + Date.now(),
-      reminderId: id,
-      title: data.title,
-      description: data.description || '',
-      scheduledAt: scheduledIso,
-      status: 'upcoming',
-      completedAt: null,
-      snoozedUntil: null,
-      priority: data.priority || 'medium',
-      category: data.category || 'personal',
-    };
-
-    setReminders((prev) => [newReminder, ...prev]);
-    setOccurrences((prev) => [newOccurrence, ...prev]);
-    return newReminder;
   };
 
-  const completeOccurrence = (occurrenceId) => {
-    setOccurrences((prev) =>
-      prev.map((occ) => {
-        if (occ.id === occurrenceId) {
-          return {
-            ...occ,
-            status: 'completed',
-            completedAt: new Date().toISOString(),
-          };
-        }
-        return occ;
-      })
-    );
+  // Snooze an Occurrence via POST /api/occurrences/:id/snooze
+  const snoozeOccurrence = async (occurrenceId, minutes = 10) => {
+    try {
+      setError(null);
+      await api.snoozeOccurrence(occurrenceId, minutes);
+      await refreshDashboard();
+    } catch (err) {
+      console.error('[snoozeOccurrence Error]:', err);
+      setError(err.message);
+      throw err;
+    }
   };
 
-  const snoozeOccurrence = (occurrenceId, minutes = 10) => {
-    const snoozedTime = new Date(Date.now() + minutes * 60 * 1000).toISOString();
-    setOccurrences((prev) =>
-      prev.map((occ) => {
-        if (occ.id === occurrenceId) {
-          return {
-            ...occ,
-            status: 'snoozed',
-            scheduledAt: snoozedTime,
-            snoozedUntil: snoozedTime,
-          };
-        }
-        return occ;
-      })
-    );
+  // Skip an Occurrence
+  const skipOccurrence = async (occurrenceId) => {
+    try {
+      setError(null);
+      await api.updateOccurrenceStatus(occurrenceId, 'skipped');
+      await refreshDashboard();
+    } catch (err) {
+      console.error('[skipOccurrence Error]:', err);
+      setError(err.message);
+      throw err;
+    }
   };
 
-  const skipOccurrence = (occurrenceId) => {
-    setOccurrences((prev) =>
-      prev.map((occ) => {
-        if (occ.id === occurrenceId) {
-          return { ...occ, status: 'skipped' };
-        }
-        return occ;
-      })
-    );
+  // Delete an Occurrence / Reminder
+  const deleteOccurrence = async (occurrenceId) => {
+    try {
+      setError(null);
+      // Find occurrence to get reminderId
+      const occ = occurrences.find((o) => o.id === occurrenceId);
+      if (occ && occ.reminderId) {
+        await api.deleteReminder(occ.reminderId);
+      }
+      await refreshDashboard();
+    } catch (err) {
+      console.error('[deleteOccurrence Error]:', err);
+      setError(err.message);
+      throw err;
+    }
   };
 
-  const deleteOccurrence = (occurrenceId) => {
-    setOccurrences((prev) => prev.filter((occ) => occ.id !== occurrenceId));
+  // Query Occurrences with filters for History View
+  const fetchFilteredOccurrences = async ({ status = 'all', search = '', sort = 'desc' }) => {
+    try {
+      setLoading(true);
+      const data = await api.getOccurrences({ status, search, sort });
+      setOccurrences(data);
+      return data;
+    } catch (err) {
+      console.error('[fetchFilteredOccurrences Error]:', err);
+      setError(err.message);
+      return [];
+    } finally {
+      setLoading(false);
+    }
   };
 
   return {
-    reminders,
+    nextUpcoming: stats.nextUpcoming,
+    completedCount: stats.completedCount,
+    upcomingCount: stats.upcomingCount,
+    totalReminders: stats.totalReminders,
     occurrences,
-    nextUpcoming,
-    completedCount,
+    loading,
+    error,
     createReminder,
     completeOccurrence,
     snoozeOccurrence,
     skipOccurrence,
     deleteOccurrence,
+    fetchFilteredOccurrences,
+    refreshDashboard,
   };
 }

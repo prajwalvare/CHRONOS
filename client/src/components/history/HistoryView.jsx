@@ -1,15 +1,32 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { format } from 'date-fns';
-import { ArrowLeft, Search, Filter, Calendar, Clock, CheckCircle2, AlertTriangle, FastForward, Bell, Trash2 } from 'lucide-react';
+import { ArrowLeft, Search, Calendar, Clock, CheckCircle2, AlertTriangle, FastForward, Bell, Trash2, RefreshCw } from 'lucide-react';
 
-export default function HistoryView({ occurrences, onBack, onComplete, onSnooze, onDelete }) {
+export default function HistoryView({
+  occurrences,
+  onBack,
+  onComplete,
+  onSnooze,
+  onDelete,
+  onFilterSearch,
+}) {
   const [filterStatus, setFilterStatus] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
-  const [sortOrder, setSortOrder] = useState('desc'); // 'desc' = newest first, 'asc' = oldest first
+  const [sortOrder, setSortOrder] = useState('desc');
   const [selectedOccurrence, setSelectedOccurrence] = useState(null);
 
-  // Filter & Search Logic
-  const filteredOccurrences = useMemo(() => {
+  // Trigger server-side query if onFilterSearch is provided
+  useEffect(() => {
+    if (onFilterSearch) {
+      const timer = setTimeout(() => {
+        onFilterSearch({ status: filterStatus, search: searchQuery, sort: sortOrder });
+      }, 250);
+      return () => clearTimeout(timer);
+    }
+  }, [filterStatus, searchQuery, sortOrder, onFilterSearch]);
+
+  // Client-side fallback filter
+  const displayedOccurrences = useMemo(() => {
     return occurrences
       .filter((occ) => {
         if (filterStatus !== 'all' && occ.status !== filterStatus) return false;
@@ -61,7 +78,7 @@ export default function HistoryView({ occurrences, onBack, onComplete, onSnooze,
               Archival History Journal
             </h1>
             <p className="text-xs uppercase tracking-widest text-chronos-textMuted font-sans mt-0.5">
-              Record of Past & Upcoming Horological Appointments
+              Persistent Records Connected to PostgreSQL Database
             </p>
           </div>
         </div>
@@ -69,9 +86,9 @@ export default function HistoryView({ occurrences, onBack, onComplete, onSnooze,
         {/* Total records count */}
         <div className="text-right font-sans text-xs text-chronos-parchment">
           <span className="text-chronos-brass font-bold font-serif text-lg">
-            {occurrences.length}
+            {displayedOccurrences.length}
           </span>{' '}
-          Recorded Occurrences
+          Ledger Entries
         </div>
       </div>
 
@@ -120,7 +137,7 @@ export default function HistoryView({ occurrences, onBack, onComplete, onSnooze,
 
       {/* Occurrences Ledger Table */}
       <div className="border border-antique/50 bg-chronos-surface/80 rounded-sm overflow-hidden shadow-2xl">
-        {filteredOccurrences.length === 0 ? (
+        {displayedOccurrences.length === 0 ? (
           <div className="p-12 text-center text-chronos-textMuted font-sans">
             <p className="font-serif text-lg text-chronos-parchment mb-1">
               No archival entries found.
@@ -141,7 +158,7 @@ export default function HistoryView({ occurrences, onBack, onComplete, onSnooze,
                 </tr>
               </thead>
               <tbody className="divide-y divide-antique/20">
-                {filteredOccurrences.map((occ) => {
+                {displayedOccurrences.map((occ) => {
                   const sched = new Date(occ.scheduledAt);
                   const completedDate = occ.completedAt ? new Date(occ.completedAt) : null;
 
@@ -191,7 +208,7 @@ export default function HistoryView({ occurrences, onBack, onComplete, onSnooze,
                       </td>
                       <td className="py-3.5 px-4 whitespace-nowrap">
                         <span className="text-[10px] uppercase font-mono text-chronos-brass">
-                          {occ.priority || 'medium'}
+                          {occ.priority || occ.reminder?.priority || 'medium'}
                         </span>
                       </td>
                       <td className="py-3.5 px-4 whitespace-nowrap text-right" onClick={(e) => e.stopPropagation()}>

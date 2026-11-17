@@ -14,16 +14,19 @@ export default function App() {
   const [clockOpacity, setClockOpacity] = useState(1);
   const scrollContainerRef = useRef(null);
 
-  // Central reminder engine
+  // Live REST API & Prisma State Engine
   const {
-    reminders,
     nextUpcoming,
     completedCount,
+    occurrences,
+    loading,
+    error,
     createReminder,
     completeOccurrence,
     snoozeOccurrence,
     deleteOccurrence,
-    occurrences,
+    fetchFilteredOccurrences,
+    refreshDashboard,
   } = useReminders();
 
   useEffect(() => {
@@ -84,6 +87,7 @@ export default function App() {
         onComplete={completeOccurrence}
         onSnooze={snoozeOccurrence}
         onDelete={deleteOccurrence}
+        onFilterSearch={fetchFilteredOccurrences}
       />
     );
   }
@@ -142,14 +146,16 @@ export default function App() {
       {/* SCENE 6: THE MAIN DASHBOARD (Your Hand-Drawn Blueprint) */}
       <div className="relative z-30">
         <MainDashboard
-          reminders={reminders}
           nextReminder={nextUpcoming}
           completedCount={completedCount}
+          loading={loading}
+          error={error}
           onCreateReminder={createReminder}
           onCompleteOccurrence={completeOccurrence}
           onSnoozeOccurrence={snoozeOccurrence}
           onOpenHistory={() => setCurrentView('history')}
           onBackToOpening={handleBackToOpening}
+          onRefresh={refreshDashboard}
         />
       </div>
     </div>

@@ -4,24 +4,22 @@ import AddReminderModal from './AddReminderModal';
 import UpcomingRibbon from './UpcomingRibbon';
 import TrophyCounter from './TrophyCounter';
 import ParchmentNote from './ParchmentNote';
-import { Plus } from 'lucide-react';
+import { Plus, AlertCircle, RefreshCw } from 'lucide-react';
 
 /**
- * MainDashboard — Pure Implementation of the Hand-Drawn Notebook Layout
- * - Top Left: Working 2D Analog Clock + Adjacent (+) Add Button
- * - Right Side: Upcoming Ribbon (Only single next reminder)
- * - Bottom Left: Trophy & Completed Count
- * - Bottom Right: Parchment Note & Random Quote (Gateway to History)
+ * MainDashboard — Fully Connected to Express & Prisma Backend
  */
 export default function MainDashboard({
-  reminders,
   nextReminder,
   completedCount,
+  loading,
+  error,
   onCreateReminder,
   onCompleteOccurrence,
   onSnoozeOccurrence,
   onOpenHistory,
   onBackToOpening,
+  onRefresh,
 }) {
   const [isModalOpen, setIsModalOpen] = useState(false);
 
@@ -41,14 +39,44 @@ export default function MainDashboard({
           </span>
         </div>
 
-        <button
-          onClick={onBackToOpening}
-          className="text-xs font-sans uppercase tracking-widest text-chronos-brass hover:text-chronos-goldHighlight transition-colors duration-200 border border-antique/50 px-3.5 py-1.5 rounded-sm hover:border-chronos-gold"
-          title="Scroll back up to the 3D clock"
-        >
-          ▲ Re-assemble Mechanism
-        </button>
+        <div className="flex items-center gap-3">
+          {onRefresh && (
+            <button
+              onClick={onRefresh}
+              className="p-1.5 text-chronos-brass hover:text-chronos-gold transition-colors border border-antique/40 rounded-sm"
+              title="Refresh database records"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+            </button>
+          )}
+
+          <button
+            onClick={onBackToOpening}
+            className="text-xs font-sans uppercase tracking-widest text-chronos-brass hover:text-chronos-goldHighlight transition-colors duration-200 border border-antique/50 px-3.5 py-1.5 rounded-sm hover:border-chronos-gold"
+            title="Scroll back up to the 3D clock"
+          >
+            ▲ Re-assemble Mechanism
+          </button>
+        </div>
       </header>
+
+      {/* Global Error Notice if Backend Disconnected */}
+      {error && (
+        <div className="my-3 p-3 bg-rose-950/40 border border-rose-800/60 rounded text-rose-300 text-xs flex items-center justify-between font-sans">
+          <div className="flex items-center gap-2">
+            <AlertCircle className="w-4 h-4 shrink-0" />
+            <span>Database Connection Notice: {error}</span>
+          </div>
+          {onRefresh && (
+            <button
+              onClick={onRefresh}
+              className="underline text-rose-200 hover:text-white ml-2"
+            >
+              Retry
+            </button>
+          )}
+        </div>
+      )}
 
       {/* Main 4-Corner Layout Canvas */}
       <main className="my-auto py-8">
