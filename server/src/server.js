@@ -3,7 +3,7 @@ dotenv.config();
 
 import app from './app.js';
 
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 5050;
 
 const server = app.listen(PORT, () => {
   console.log(`[CHRONOS Server] Horological engine listening on http://localhost:${PORT}`);
