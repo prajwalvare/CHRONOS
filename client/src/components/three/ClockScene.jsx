@@ -3,7 +3,7 @@ import { Canvas } from '@react-three/fiber';
 import MechanicalClock from './MechanicalClock';
 
 /**
- * ClockScene — 3D Canvas Host with Horological Lighting & Perspective Camera
+ * ClockScene — Clean Centered 3D Canvas
  */
 export default function ClockScene({ explosionProgress = 0, opacity = 1 }) {
   return (
@@ -13,7 +13,7 @@ export default function ClockScene({ explosionProgress = 0, opacity = 1 }) {
       aria-hidden="true"
     >
       <Canvas
-        camera={{ position: [0, 0, 7.8], fov: 42 }}
+        camera={{ position: [0, 0, 8.0], fov: 42 }}
         dpr={[1, 2]}
         gl={{
           antialias: true,
@@ -22,32 +22,31 @@ export default function ClockScene({ explosionProgress = 0, opacity = 1 }) {
         }}
       >
         <Suspense fallback={null}>
-          {/* Ambient Studio Lighting (Warm Horological Glow) */}
-          <ambientLight intensity={0.65} color="#382E1E" />
+          <ambientLight intensity={0.7} color="#362E20" />
 
-          {/* Key Light: High-angle golden spotlight creating rich specular reflections on brass */}
+          {/* Key Light */}
           <directionalLight
             position={[4, 6, 6]}
-            intensity={2.8}
+            intensity={3.0}
             color="#FFF4D4"
           />
 
-          {/* Rim Light: Accentuates the beveled glass crystal and coin-edge bezel */}
+          {/* Rim Light */}
           <directionalLight
             position={[-5, -4, 4]}
-            intensity={1.2}
+            intensity={1.4}
             color="#C9A45C"
           />
 
-          {/* Jewel Point Light: Highlights ruby endstones and motion work depth */}
+          {/* Center Point Light to make gears sparkle */}
           <pointLight
-            position={[0.5, -0.4, 1.2]}
-            intensity={1.8}
-            distance={4}
+            position={[0.2, 0.1, 1.8]}
+            intensity={2.0}
+            distance={5}
             color="#E5C78A"
           />
 
-          {/* The Clock Assembly */}
+          {/* Mechanical Clock */}
           <MechanicalClock explosionProgress={explosionProgress} />
         </Suspense>
       </Canvas>
