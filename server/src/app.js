@@ -6,6 +6,7 @@ import rateLimit from 'express-rate-limit';
 import reminderRoutes from './routes/reminderRoutes.js';
 import occurrenceRoutes from './routes/occurrenceRoutes.js';
 import statsRoutes from './routes/statsRoutes.js';
+import pushRoutes from './routes/pushRoutes.js';
 
 const app = express();
 
@@ -48,6 +49,7 @@ app.get('/api/health', (req, res) => {
 app.use('/api/reminders', reminderRoutes);
 app.use('/api/occurrences', occurrenceRoutes);
 app.use('/api/stats', statsRoutes);
+app.use('/api/push', pushRoutes);
 
 // Centralized 404 Handler
 app.use('/api/*', (req, res) => {
