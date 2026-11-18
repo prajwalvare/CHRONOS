@@ -53,7 +53,8 @@ export const usePush = () => {
         console.log('[usePush] Service worker is ready');
 
         // Step 4: Get VAPID public key from backend
-        const res = await fetch('/api/push/vapidPublicKey');
+        const apiBase = import.meta.env.VITE_API_URL || '';
+        const res = await fetch(`${apiBase}/api/push/vapidPublicKey`);
         if (!res.ok) {
           console.error('[usePush] Failed to fetch VAPID key:', res.status);
           return;
@@ -77,7 +78,7 @@ export const usePush = () => {
         console.log('[usePush] Push subscription created');
 
         // Step 7: Send subscription to backend
-        await fetch('/api/push/subscribe', {
+        await fetch(`${apiBase}/api/push/subscribe`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(subscription.toJSON()),

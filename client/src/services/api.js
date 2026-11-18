@@ -6,8 +6,11 @@
  * - /api/stats
  */
 
+const API_BASE = import.meta.env.VITE_API_URL || '';
+
 async function request(endpoint, options = {}) {
-  const url = endpoint.startsWith('/') ? endpoint : `/api/${endpoint}`;
+  const path = endpoint.startsWith('/') ? endpoint : `/api/${endpoint}`;
+  const url = `${API_BASE}${path}`;
   const headers = {
     'Content-Type': 'application/json',
     ...(options.headers || {}),
